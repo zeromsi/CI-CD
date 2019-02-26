@@ -1,0 +1,75 @@
+
+pipeline{
+  agent { label 'maven' }
+  stages{
+    stage ('checkout'){
+      steps{
+        checkout scm
+      }
+    }
+    
+    
+        stage ('build') {
+      steps{
+      sh "mvn clean package -DskipTests"       
+      }
+    }
+    
+    
+     stage ('Static Analysis') {
+      steps{
+        sh "mvn sonar:sonar -Dsonar.host.url=http://sonarqube-ngfs-core-framework.apps.115.127.24.184.nip.io -Dsonar.login=[token]"
+      }
+   }  
+    
+    
+         stage ('Unit test') {
+      steps{
+        sh "mvn test -Dtest=AllUnitTests"
+      }
+    }
+
+
+    stage ('build image') {
+      steps{
+      sh '''
+          oc start-build stagingpo-build --from-dir=. --follow
+        '''
+      }
+    }
+    
+       stage ('sleep time'){
+    steps{
+      sh 'sleep 140s'        
+      }
+    }    
+    stage ('Integration test') {       
+     steps{      
+        sh "mvn test -Dtest=BasicIntegrationTests"
+    }
+  }
+  
+    stage ('build production tested image') {
+      steps{
+      sh '''
+          oc start-build productionpo-build --from-dir=. --follow
+        '''
+      }
+    }  
+  }
+    post {
+       always {
+            echo 'This will always run'
+            mail bcc: '', body: "abc", cc: '', charset: 'UTF-8', from: 'www.zeromsi2@gmail.com', mimeType: 'text/html', replyTo: '', subject: "ERROR CI: Project name -> ", to: 		   "www.zeromsi2@gmail.com";
+
+        }
+   
+       failure {
+            mail to: 'www.zeromsi2@gmail.com',
+            subject: "Failed Pipeline: ${currentBuild.fullDisplayName} Job: ${env.JOB_NAME} ",
+            body: "Something is wrong with ${env.BUILD_URL}"
+        }
+   
+    }
+}
+

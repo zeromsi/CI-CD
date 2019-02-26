@@ -1,0 +1,49 @@
+pipeline{
+  agent { label 'nodejs8' }
+  stages{
+    stage ('checkout'){
+      steps{
+        checkout scm
+      }
+    }
+    stage ('install modules'){
+      steps{
+        sh '''
+          npm install --verbose -d
+        '''
+      }
+    }
+    stage ('test'){
+      steps{
+        sh '''
+          echo "Run test here"
+        '''
+      }
+      post {
+          always {
+            sh '''
+                echo "Submit test for processing"
+            '''
+          }
+      }
+    }
+    stage ('code quality'){
+      steps{
+        sh 'echo "Process code quality, ex: linting"'
+      }
+    }
+    stage ('build') {
+      steps{
+        sh '$(npm bin)/ember build --prod'
+      }
+    }
+    stage ('build image') {
+      steps{
+        sh '''
+          rm -rf node_modules
+          oc start-build frontend-asset-build --from-dir=. --follow
+        '''
+      }
+    }
+  }
+}
