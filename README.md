@@ -12,3 +12,4 @@ Jenkins is a CI (continuous integration) server. It can schedule and run scripte
 ### Pipeline
 A pipeline is a set of software deployment and delivery stages. 
 ### Complete CI/CD pipeline
+![alt text](https://github.com/zeromsi/Jenkins-CI-CD-pipeline/blob/master/CI%252FCD%20Pipeline.png?raw=true)
