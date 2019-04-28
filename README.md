@@ -13,3 +13,26 @@ Jenkins is a CI (continuous integration) server. It can schedule and run scripte
 A pipeline is a set of software deployment and delivery stages. 
 ### Complete CI/CD pipeline
 ![alt text](https://github.com/zeromsi/Jenkins-CI-CD-pipeline/blob/master/CI%252FCD%20Pipeline.png?raw=true)
+
+### Installation (maven project)
+1. Install ``` pipeline utility steps ``` plugin in jenkins
+2. All Unit tests must run first. 
+3. Unit test Suite will be like following,
+```xml 
+@RunWith(Suite.class)
+@SuiteClasses({Basic.class,PayOrderServiceTest.class})
+public class AllUnitTests {
+	@BeforeClass
+	public static void setUpClass() {
+		  try {
+	        	BufferedWriter writer = new BufferedWriter(new FileWriter("./jenkins/my.properties"));
+				writer.write("BATCHID="+new Date().getTime());
+				 writer.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+	}
+
+}
+```
+4. Add a file inside your ``` jenkinsFile ``` directory named as ``` my.properties ```
