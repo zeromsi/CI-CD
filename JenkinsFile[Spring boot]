@@ -1,75 +1,239 @@
+def RESPONSE
 
 pipeline{
   agent { label 'maven' }
-  stages{
+     parameters {
+        string(name: 'consoleLog', defaultValue: '')
+        string(name: 'totalUnitTest', defaultValue: '0')
+        string(name: 'totalUnitTestFailure', defaultValue: '0')
+        string(name: 'totalUnitTestError', defaultValue: '0')
+        string(name: 'totalSkippedUnitTest', defaultValue: '0')
+				string(name: 'totalIntegrationTest', defaultValue: '0')
+				string(name: 'totalIntegrationTestFailure', defaultValue: '0')
+				string(name: 'totalIntegrationTestError', defaultValue: '0')
+				string(name: 'totalSkippedIntegrationTest', defaultValue: '0')
+				string(name: 'batchID', defaultValue: '0')
+				string(name: 'commitInfo', defaultValue: 'null')
+				string(name: 'gitUserName', defaultValue: 'null')
+				string(name: 'emailAddress', defaultValue: 'null')
+				
+	    }   
+    environment {          
+        def consoleLog = "${params.consoleLog}"
+        def totalUnitTest = "${params.totalUnitTest}"
+        def totalUnitTestFailure = "${params.totalUnitTestFailure}"
+        def totalUnitTestError = "${params.totalUnitTestError}"
+        def totalSkippedUnitTest = "${params.totalSkippedUnitTest}"
+        def totalIntegrationTest = "${params.totalIntegrationTest}"
+        def totalIntegrationTestFailure = "${params.totalIntegrationTestFailure}"
+        def totalIntegrationTestError = "${params.totalIntegrationTestError}"
+        def totalSkippedIntegrationTest = "${params.totalSkippedIntegrationTest}"
+        def batchID = "${params.batchID}" 
+        def commitInfo = "${params.commitInfo}" 
+        def gitUserName = "${params.gitUserName}" 
+        def emailAddress = "${params.emailAddress}"    
+    }
+  
+	  stages{
     stage ('checkout'){
       steps{
         checkout scm
       }
     }
+      
     
-    
-        stage ('build') {
+    stage ('build') {
       steps{
       sh "mvn clean package -DskipTests"       
       }
     }
     
     
-     stage ('Static Analysis') {
-      steps{
-        sh "mvn sonar:sonar -Dsonar.host.url=http://sonarqube-ngfs-core-framework.apps.115.127.24.184.nip.io -Dsonar.login=[token]"
-      }
-   }  
+  //  stage ('Static Analysis') {
+     // steps{
+     //   sh "mvn sonar:sonar -Dsonar.host.url=http://sonarqube-ngfs-core-framework.apps.115.127.24.184.nip.io -Dsonar.login=bb3cad87ac058467c7204a5a72713111acf44d72"
+    //  }
+   // }  
     
     
-         stage ('Unit test') {
+     stage ('Unit test') {
       steps{
         sh "mvn test -Dtest=AllUnitTests"
       }
     }
 
 
-    stage ('build image') {
+     stage ('build image') {
       steps{
-      sh '''
-          oc start-build stagingpo-build --from-dir=. --follow
-        '''
+         sh '''
+            oc start-build stagingpo-build --from-dir=. --follow
+         '''
       }
     }
     
-       stage ('sleep time'){
-    steps{
-      sh 'sleep 140s'        
+     stage ('sleep time'){
+      steps{
+         sh 'sleep 140s'        
       }
-    }    
+    }   
+    
+     
     stage ('Integration test') {       
      steps{      
         sh "mvn test -Dtest=BasicIntegrationTests"
     }
   }
   
-    stage ('build production tested image') {
+      stage ('build production tested image') {
       steps{
       sh '''
           oc start-build productionpo-build --from-dir=. --follow
         '''
       }
-    }  
+    }    
   }
     post {
        always {
-            echo 'This will always run'
-            mail bcc: '', body: "abc", cc: '', charset: 'UTF-8', from: 'www.zeromsi2@gmail.com', mimeType: 'text/html', replyTo: '', subject: "ERROR CI: Project name -> ", to: 		   "www.zeromsi2@gmail.com";
+       setCommitInfo()
+          script{
+       
+          gitUserName=commitInfo.takeWhile { it != ' ' }
+          emailAddress=commitInfo.toString().substring(commitInfo.toString().indexOf("<") +1,commitInfo.toString().indexOf(">"));
+          echo "${gitUserName} ${emailAddress}"
 
+          //To User readProperties 'pipeline utility steps' plugin must be installed
+           def props = readProperties  file: 'jenkins/my.properties'
+     	   batchIDText=props.toString().substring(props.toString().indexOf("BATCHID:") + "BATCHID:".length());
+     	   batchID=batchIDText.takeWhile { it != ']' }
+           echo "${batchID}"
+
+           consoleTextUrl="${env.BUILD_URL}consoleText"
+           //consoleTextUrl="https://jenkins-ngfs-core-framework.apps.115.127.24.184.nip.io/job/ngfs-core-framework/job/ngfs-core-framework-payorder-demo/197/consoleText"
+	   consoleLog = sh(script: "curl -u shahidul-admin:ba4dbc27628b69644037e8db5041618f  ${consoleTextUrl} -k -H Content-Type:application/json", returnStdout: true).trim()
+
+	   String substrFirstStep="Results:";
+	   substrSecondStep="Tests run:";
+	   String afterStringOfFirstSubString =consoleLog
+					       .substring(consoleLog.indexOf(substrFirstStep) + substrFirstStep.length());
+	   String testResultsAfterFirstStep=afterStringOfFirstSubString.substring(0,80);
+
+	   String afterStringOfSecondSubString =testResultsAfterFirstStep
+					       .substring(testResultsAfterFirstStep.indexOf(substrSecondStep) + substrSecondStep.length());
+	   totalUnitTest=afterStringOfSecondSubString.takeWhile { it != ',' }
+					 
+	   String totalFailureSubStr="Failures: ";
+	   totalUnitTestFailure=testResultsAfterFirstStep
+			       .substring(testResultsAfterFirstStep.indexOf(totalFailureSubStr) + totalFailureSubStr.length())
+			       .takeWhile { it != ',' };
+					 
+	   String totalErrorsSubStr="Errors: ";
+	   totalUnitTestError=testResultsAfterFirstStep
+			    .substring(testResultsAfterFirstStep.indexOf(totalErrorsSubStr) + totalErrorsSubStr.length())
+			    .takeWhile { it != ',' };
+     			 
+     	   String totalSkippedSubStr="Skipped: ";
+ 	   totalSkippedUnitTest=testResultsAfterFirstStep
+				.substring(testResultsAfterFirstStep.indexOf(totalSkippedSubStr) + totalSkippedSubStr.length())
+				.takeWhile { it != '' };  				
+
+ 	   sh """
+    		curl -X POST \
+    			-H \'Content-type: application/json\' \
+   			--url http://log-ngfs-core-framework.apps.115.127.24.184.nip.io/pipelinetestlogs \
+   			--data \'[{
+					"id":"${currentBuild.startTimeInMillis}1",
+					"timeStamp":0,
+					"totalError": "${totalUnitTestError}",
+					"totalFailure": "${totalUnitTestFailure}",
+					"totalSkipped": "${totalSkippedUnitTest}",
+					"totalTest":"${totalUnitTest}",
+					"type": "Unit",
+					"buildNumber":"${env.BUILD_ID}",
+					"batchId":"${batchID}",
+					"gitUserName":"${gitUserName}"
+				 }]\'
+		
+		"""
+	
+	
+	   String substrIntegrationTest="Integration test";
+	   String integrationTestPart=afterStringOfFirstSubString
+				     .substring(afterStringOfFirstSubString.indexOf(substrIntegrationTest) + substrIntegrationTest.length());
+	
+
+	   String substrFirstStepForIntegrationTest="Results:";
+	   substrSecondStepForIntegrationTest="Tests run:";
+	   String afterStringOfFirstSubStringForIntegrationTest =integrationTestPart
+								.substring(integrationTestPart
+								.indexOf(substrFirstStepForIntegrationTest) +substrFirstStepForIntegrationTest.length());
+	   String testResultsAfterFirstStepForIntegrationTest=afterStringOfFirstSubStringForIntegrationTest.substring(0,90);
+           String afterStringOfSecondSubStringForIntegrationTest =testResultsAfterFirstStepForIntegrationTest
+								 .substring(testResultsAfterFirstStepForIntegrationTest
+								 .indexOf(substrSecondStepForIntegrationTest) + substrSecondStepForIntegrationTest.length());
+	   totalIntegrationTest=afterStringOfSecondSubStringForIntegrationTest.takeWhile { it != ',' }
+					 
+	   String totalFailureSubStrOfIntegrationTest="Failures: ";
+	   totalIntegrationTestFailure=testResultsAfterFirstStepForIntegrationTest
+				      .substring(testResultsAfterFirstStepForIntegrationTest
+				      .indexOf(totalFailureSubStrOfIntegrationTest) + totalFailureSubStrOfIntegrationTest.length())
+				      .takeWhile { it != ',' };
+					 
+	  String totalErrorsSubStrOfIntegrationTest="Errors: ";
+	  totalIntegrationTestError=testResultsAfterFirstStepForIntegrationTest
+				   .substring(testResultsAfterFirstStepForIntegrationTest
+      				   .indexOf(totalErrorsSubStrOfIntegrationTest) + totalErrorsSubStrOfIntegrationTest.length())
+				   .takeWhile { it != ',' };
+     			 
+     	  String totalSkippedSubStrOfIntegrationTest="Skipped: ";
+ 	  totalSkippedIntegrationTest=testResultsAfterFirstStepForIntegrationTest
+				     .substring(testResultsAfterFirstStepForIntegrationTest
+    				     .indexOf(totalSkippedSubStrOfIntegrationTest) + totalSkippedSubStrOfIntegrationTest.length())
+				     .takeWhile { it != '' }; 
+ 				
+     	  sh """
+     	      curl -X POST \
+    		      -H \'Content-type: application/json\' \
+    		      --url http://log-ngfs-core-framework.apps.115.127.24.184.nip.io/pipelinetestlogs \
+   		      --data \'[{
+					"id":"${currentBuild.startTimeInMillis}",
+					"timeStamp":0,
+					"totalError": "${totalIntegrationTestError}",
+					"totalFailure": "${totalIntegrationTestFailure}",
+					"totalSkipped": "${totalSkippedIntegrationTest}",
+					"totalTest":"${totalIntegrationTest}",
+					"type": "Integration",
+					"buildNumber":"${env.BUILD_ID}",
+					"batchId":"${batchID}",
+					"gitUserName":"${gitUserName}"
+			      }]\'
+							
+	    """
+    
+     }
+     notifyStatusChangeViaEmail("")
         }
    
-       failure {
-            mail to: 'www.zeromsi2@gmail.com',
-            subject: "Failed Pipeline: ${currentBuild.fullDisplayName} Job: ${env.JOB_NAME} ",
-            body: "Something is wrong with ${env.BUILD_URL}"
+        failure {
+              notifyStatusChangeViaEmail("Something went wrong:")     
         }
    
     }
 }
+	def setCommitInfo(){
+			sh 'git rev-parse HEAD > commit'
+			def commit = readFile('commit').trim()
+			sh 'git show --format="%aN <%aE>" ${commit} > commitInfo'
+			commitInfo = readFile('commitInfo').trim()
+		}
+		
+		
+	def notifyStatusChangeViaEmail(message) {
+			mail to: "${emailAddress}",
+           		subject: "Pipeline Info: ${currentBuild.fullDisplayName} Job: ${env.JOB_NAME} ",
+            body: message+"See More ${env.BUILD_URL} totalTest: ${totalUnitTest} || totalFailure: ${totalUnitTestFailure} || totalError: ${totalUnitTestError} || totalSkipped: ${totalSkippedUnitTest}"  
+		}
+
+ 
+
+
 
