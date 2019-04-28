@@ -1,5 +1,4 @@
 def RESPONSE
-
 pipeline{
   agent { label 'maven' }
      parameters {
@@ -15,8 +14,8 @@ pipeline{
 				string(name: 'batchID', defaultValue: '0')
 				string(name: 'commitInfo', defaultValue: 'null')
 				string(name: 'gitUserName', defaultValue: 'null')
-				string(name: 'emailAddress', defaultValue: 'null')
-				
+				string(name: 'emailAddress', defaultValue: 'null')	
+				string(name: 'isIntegrationTestRan', defaultValue: '0')			
 	    }   
     environment {          
         def consoleLog = "${params.consoleLog}"
@@ -32,6 +31,7 @@ pipeline{
         def commitInfo = "${params.commitInfo}" 
         def gitUserName = "${params.gitUserName}" 
         def emailAddress = "${params.emailAddress}"    
+        def isIntegrationTestRan="${params.isIntegrationTestRan}"
     }
   
 	  stages{
@@ -50,9 +50,9 @@ pipeline{
     
     
   //  stage ('Static Analysis') {
-     // steps{
-     //   sh "mvn sonar:sonar -Dsonar.host.url=http://sonarqube-ngfs-core-framework.apps.115.127.24.184.nip.io -Dsonar.login=bb3cad87ac058467c7204a5a72713111acf44d72"
-    //  }
+  //    steps{
+   //     sh "mvn sonar:sonar -Dsonar.host.url=http://sonarqube-ngfs-core-framework.apps.115.127.24.184.nip.io -Dsonar.login=02737bd3aed2250b1be43be112aeb206826716f1"
+   //   }
    // }  
     
     
@@ -92,6 +92,7 @@ pipeline{
       }
     }    
   }
+  
     post {
        always {
        setCommitInfo()
@@ -108,20 +109,21 @@ pipeline{
            echo "${batchID}"
 
            consoleTextUrl="${env.BUILD_URL}consoleText"
-           //consoleTextUrl="https://jenkins-ngfs-core-framework.apps.115.127.24.184.nip.io/job/ngfs-core-framework/job/ngfs-core-framework-payorder-demo/197/consoleText"
+         //  consoleTextUrl="https://jenkins-ngfs-core-framework.apps.115.127.24.184.nip.io/job/ngfs-core-framework/job/ngfs-core-framework-payorder-demo/197/consoleText"
 	   consoleLog = sh(script: "curl -u shahidul-admin:ba4dbc27628b69644037e8db5041618f  ${consoleTextUrl} -k -H Content-Type:application/json", returnStdout: true).trim()
 
 	   String substrFirstStep="Results:";
 	   substrSecondStep="Tests run:";
 	   String afterStringOfFirstSubString =consoleLog
 					       .substring(consoleLog.indexOf(substrFirstStep) + substrFirstStep.length());
-	   String testResultsAfterFirstStep=afterStringOfFirstSubString.substring(0,80);
+	   String testResultsAfterFirstStep=afterStringOfFirstSubString.substring(0,200);
+
 
 	   String afterStringOfSecondSubString =testResultsAfterFirstStep
 					       .substring(testResultsAfterFirstStep.indexOf(substrSecondStep) + substrSecondStep.length());
 	   totalUnitTest=afterStringOfSecondSubString.takeWhile { it != ',' }
 					 
-	   String totalFailureSubStr="Failures: ";
+	   String totalFailureSubStr=" Failures: ";
 	   totalUnitTestFailure=testResultsAfterFirstStep
 			       .substring(testResultsAfterFirstStep.indexOf(totalFailureSubStr) + totalFailureSubStr.length())
 			       .takeWhile { it != ',' };
@@ -139,7 +141,7 @@ pipeline{
  	   sh """
     		curl -X POST \
     			-H \'Content-type: application/json\' \
-   			--url http://log-ngfs-core-framework.apps.115.127.24.184.nip.io/pipelinetestlogs \
+   			--url http://elk-ngfs-core-framework.apps.115.127.24.184.nip.io/pipelinetestlogs \
    			--data \'[{
 					"id":"${currentBuild.startTimeInMillis}1",
 					"timeStamp":0,
@@ -154,25 +156,25 @@ pipeline{
 				 }]\'
 		
 		"""
-	
-	
+		
+		if(totalUnitTestFailure=="0"){
+		isIntegrationTestRan="1";
 	   String substrIntegrationTest="Integration test";
 	   String integrationTestPart=afterStringOfFirstSubString
 				     .substring(afterStringOfFirstSubString.indexOf(substrIntegrationTest) + substrIntegrationTest.length());
 	
-
 	   String substrFirstStepForIntegrationTest="Results:";
 	   substrSecondStepForIntegrationTest="Tests run:";
 	   String afterStringOfFirstSubStringForIntegrationTest =integrationTestPart
 								.substring(integrationTestPart
 								.indexOf(substrFirstStepForIntegrationTest) +substrFirstStepForIntegrationTest.length());
-	   String testResultsAfterFirstStepForIntegrationTest=afterStringOfFirstSubStringForIntegrationTest.substring(0,90);
+	   String testResultsAfterFirstStepForIntegrationTest=afterStringOfFirstSubStringForIntegrationTest.substring(0,200);
            String afterStringOfSecondSubStringForIntegrationTest =testResultsAfterFirstStepForIntegrationTest
 								 .substring(testResultsAfterFirstStepForIntegrationTest
 								 .indexOf(substrSecondStepForIntegrationTest) + substrSecondStepForIntegrationTest.length());
 	   totalIntegrationTest=afterStringOfSecondSubStringForIntegrationTest.takeWhile { it != ',' }
 					 
-	   String totalFailureSubStrOfIntegrationTest="Failures: ";
+	   String totalFailureSubStrOfIntegrationTest=" Failures: ";
 	   totalIntegrationTestFailure=testResultsAfterFirstStepForIntegrationTest
 				      .substring(testResultsAfterFirstStepForIntegrationTest
 				      .indexOf(totalFailureSubStrOfIntegrationTest) + totalFailureSubStrOfIntegrationTest.length())
@@ -188,12 +190,11 @@ pipeline{
  	  totalSkippedIntegrationTest=testResultsAfterFirstStepForIntegrationTest
 				     .substring(testResultsAfterFirstStepForIntegrationTest
     				     .indexOf(totalSkippedSubStrOfIntegrationTest) + totalSkippedSubStrOfIntegrationTest.length())
-				     .takeWhile { it != '' }; 
- 				
+				     .takeWhile { it != '' }; 				
      	  sh """
      	      curl -X POST \
     		      -H \'Content-type: application/json\' \
-    		      --url http://log-ngfs-core-framework.apps.115.127.24.184.nip.io/pipelinetestlogs \
+    		      --url http://elk-ngfs-core-framework.apps.115.127.24.184.nip.io/pipelinetestlogs \
    		      --data \'[{
 					"id":"${currentBuild.startTimeInMillis}",
 					"timeStamp":0,
@@ -208,9 +209,11 @@ pipeline{
 			      }]\'
 							
 	    """
+	    
+	    }
     
      }
-     notifyStatusChangeViaEmail("")
+     notifyStatusChangeViaEmail("Successful:")
         }
    
         failure {
@@ -228,12 +231,19 @@ pipeline{
 		
 		
 	def notifyStatusChangeViaEmail(message) {
+	if(isIntegrationTestRan=='0'){
 			mail to: "${emailAddress}",
            		subject: "Pipeline Info: ${currentBuild.fullDisplayName} Job: ${env.JOB_NAME} ",
-            body: message+"See More ${env.BUILD_URL} totalTest: ${totalUnitTest} || totalFailure: ${totalUnitTestFailure} || totalError: ${totalUnitTestError} || totalSkipped: ${totalSkippedUnitTest}"  
-		}
+            body: message+"See More ${env.BUILD_URL} totalTest: ${totalUnitTest} || totalFailure: ${totalUnitTestFailure} || totalError: ${totalUnitTestError} || totalSkipped: ${totalSkippedUnitTest} "  
+	
+	}else{
+		mail to: "${emailAddress}",
+           		subject: "Pipeline Info: ${currentBuild.fullDisplayName} Job: ${env.JOB_NAME} ",
+            body: message+"See More ${env.BUILD_URL} Unit Test Result- totalTest: ${totalUnitTest} || totalFailure: ${totalUnitTestFailure} || totalError: ${totalUnitTestError} || totalSkipped: ${totalSkippedUnitTest}, Integration Test Result- totalTest: ${totalIntegrationTest} || totalFailure: ${totalIntegrationTestFailure} || totalError: ${totalIntegrationTestError} || totalSkipped: ${totalSkippedIntegrationTest} "  
+	}
+	
+	}
 
  
-
 
 
