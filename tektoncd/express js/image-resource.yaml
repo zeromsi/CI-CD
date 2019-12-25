@@ -1,0 +1,9 @@
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: express-js-image-prs
+spec:
+  type: image
+  params:
+    - name: url
+      value: zeromsi2/express-image
