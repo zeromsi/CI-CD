@@ -1,0 +1,5 @@
+FROM openjdk:8-jdk-alpine
+EXPOSE 9001
+WORKDIR /app
+COPY target/artifactId-version.jar .
+ENTRYPOINT [ "java", "-jar", "artifactId-version.jar" ]
