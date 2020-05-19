@@ -36,3 +36,6 @@ public class AllUnitTests {
 }
 ```
 4. Add a file inside your ``` jenkinsFile ``` directory named as ``` my.properties ```
+
+
+For further [read](https://docs.google.com/document/d/1gdhxoADVA8Tsz1kfNUL4lqVL5P8mytcQexZn6kociiU/edit)
